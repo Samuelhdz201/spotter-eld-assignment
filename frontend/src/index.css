@@ -2,55 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0f172a;
-}
-::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+:root {
+  color-scheme: dark;
 }
 
-/* Leaflet map overrides for dark theme */
-.leaflet-container {
-  background: #1e293b;
-  border-radius: 12px;
+body {
+  margin: 0;
+  background-color: #020617; /* Fondo ultra oscuro profesional */
+  color: #f1f5f9;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Custom scrollbar - Más delgada y discreta */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 10px;
+}
+
+/* Leaflet map overrides - Ajustado para que no "brille" tanto el fondo */
+.leaflet-container {
+  background: #0f172a !important;
+  border-radius: 24px; /* Bordes más redondeados para look moderno */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .leaflet-control-zoom a {
   background: #1e293b !important;
   color: #e2e8f0 !important;
-  border-color: #334155 !important;
-}
-.leaflet-popup-content-wrapper {
-  background: #1e293b;
-  color: #e2e8f0;
-  border-radius: 8px;
-}
-.leaflet-popup-tip {
-  background: #1e293b;
+  border: 1px solid #334155 !important;
 }
 
-/* Log sheet grid styling */
-.log-grid-line {
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* Pulse animation for active indicators */
-@keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-.animate-pulse-soft {
-  animation: pulse-soft 2s ease-in-out infinite;
-}
-
-/* Glass morphism cards */
+/* Glass morphism cards mejorado */
 .glass-card {
-  background: rgba(30, 41, 59, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(15, 23, 42, 0.6);
+ backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Efecto de brillo para el botón principal */
+.btn-primary-glow {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  transition: all 0.3s ease;
+}
+.btn-primary-glow:hover {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
 }

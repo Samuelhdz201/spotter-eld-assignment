@@ -1,82 +1,133 @@
-# Spotter ELD — Trip Planner & Log Generator
-
-**Spotter ELD** is a high-performance full-stack application designed to transform trip details into optimized routes and FMCSA-compliant Electronic Logging Device (ELD) daily log sheets. 
-
+Spotter ELD — Trip Planner & Log Generator
+A full-stack application that transforms trip details into optimized routes and FMCSA-compliant ELD daily log sheets. Enter your current location, pickup, dropoff, and cycle hours — the system calculates the complete route with all required stops and generates drawn log sheets for each day of the trip.
 Built as a technical assessment for the Spotter AI Full Stack Developer role.
+Live Demo
 
----
+Frontend: your-vercel-url.vercel.app
+Backend API: your-railway-url.up.railway.app
+Loom Walkthrough: your-loom-link
 
-##  Features
 
-* **Trip Planning:** Interactive interface to input location, pickup/dropoff points, and current cycle status.
-* **Intelligent Route Calculation:** Integrates **OpenRouteService API** for real-world commercial routing.
-* **HOS Compliance Engine:** A robust backend engine that validates and enforces **FMCSA Hours of Service** regulations.
-* **Pro Interactive Map:** Customized Leaflet map with dark-mode integration.
-* **ELD Log Sheets:** High-fidelity **SVG/Grid rendering** of the official FMCSA graph.
+Replace these links with your actual URLs before submitting.
 
----
 
-##  Tech Stack
+Features
 
-* **Backend:** Django 5 + Django REST Framework (Python 3.10+)
-* **Frontend:** React 18 + Vite + Tailwind CSS
-* **Maps:** Leaflet.js + OpenRouteService
-* **Production:** WhiteNoise (Static files), Gunicorn (WSGI Server)
+Trip Planning — Interactive form to input current location, pickup/dropoff points, and current cycle hours used
+Route Calculation — Integrates OpenRouteService API (HGV profile) for commercial truck routing with haversine fallback
+HOS Compliance Engine — Validates and enforces all FMCSA Hours of Service regulations (49 CFR Part 395)
+Interactive Map — Dark-mode Leaflet map showing the route with color-coded stop markers
+ELD Log Sheets — High-fidelity SVG rendering of the official FMCSA Form 395.8 graph grid, with drawn duty status lines, 15-minute increments, remarks, and 24-hour verification totals
+Multi-Day Support — Automatically generates multiple log sheets for longer trips, correctly splitting entries at midnight
 
----
 
-##  HOS Rules Implemented
+Tech Stack
+LayerTechnologyBackendDjango 5 + Django REST FrameworkFrontendReact 18 + Vite + Tailwind CSSMapsLeaflet.js + OpenRouteService (HGV profile)Log RenderingCustom SVG (no external charting libraries)ProductionGunicorn + WhiteNoise
 
-| Rule | Limit | Implementation Detail |
-| :--- | :--- | :--- |
-| **Driving Limit** | 11 Hours | Stops driving state once limit is reached within a shift. |
-| **Duty Window** | 14 Hours | Enforces the "daily clock" starting from the first On-Duty event. |
-| **Rest Break** | 30 Minutes | Automatically inserts a break after 8 cumulative hours of driving. |
-| **Off-Duty Reset** | 10 Hours | Required consecutive rest period to reset the 11/14h clocks. |
-| **Weekly Cycle** | 70h / 8 days | Tracks cumulative On-Duty time with a 34h restart detection. |
-| **Fuel Stops** | 1,000 Miles | Smart insertion of 30-min fueling events based on distance. |
-| **Service Time** | 1 Hour | Fixed On-Duty time for both Pickup and Dropoff locations. |
+HOS Rules Implemented
+RuleLimitCFR ReferenceImplementationDriving Limit11 hours§395.3(a)(3)Stops driving once limit is reached within a shiftDuty Window14 hours§395.3(a)(2)Enforces clock starting from first on-duty eventRest Break30 minutes§395.3(a)(3)(ii)Auto-inserted after 8 cumulative hours of drivingOff-Duty Reset10 hours§395.3(a)(1)Required consecutive rest to reset 11/14h clocksWeekly Cycle70h / 8 days§395.3(b)Tracks cumulative on-duty with 34-hour restartFuel StopsEvery 1,000 miAssessment req.30-min fueling stops based on distancePickup/Dropoff1 hour eachAssessment req.Fixed on-duty not driving time
+Assumptions (per assessment requirements)
 
----
+Property-carrying CMV driver
+70-hour/8-day cycle (no 60/7)
+No adverse driving conditions
+Average speed: 55 mph
 
-##  Quick Start
 
-### 1. Prerequisites
-* Python 3.10+ & Node.js 18+
-* OpenRouteService API key (Free at [openrouteservice.org](https://openrouteservice.org/))
+Quick Start
+Prerequisites
 
-### 2. Backend Setup
-```bash
-cd backend
+Python 3.10+
+Node.js 18+
+OpenRouteService API key (free at openrouteservice.org)
+
+Backend
+bashcd backend
 python -m venv venv
+
 # Windows:
 venv\Scripts\activate
-# Linux/Mac:
-# source venv/bin/activate
+# macOS/Linux:
+source venv/bin/activate
 
 pip install -r requirements.txt
+
+# Create .env file
+cp .env.example .env
+# Edit .env and add your ORS_API_KEY
+
 python manage.py migrate
 python manage.py runserver
-3. Frontend Setup
-Bash
-cd frontend
+Backend runs at http://localhost:8000
+Frontend
+bashcd frontend
 npm install
 npm run dev
- Deployment
-Backend (Railway)
-Root Directory: /backend
+Frontend runs at http://localhost:5173
 
-Variables: Set ORS_API_KEY, DEBUG=False, and SECRET_KEY.
+API
+POST /api/trip/plan/
+Request:
+json{
+  "current_location": "Dallas, TX",
+  "pickup_location": "Denver, CO",
+  "dropoff_location": "Seattle, WA",
+  "current_cycle_used": 20
+}
+Response: Trip summary, route geometry, stops array, and daily log sheets with entries and totals.
+GET /api/trip/health/
+Health check endpoint.
+
+Deployment
+Backend (Railway)
+
+Root directory: /backend
+Start command: gunicorn spotter_backend.wsgi:application --bind 0.0.0.0:$PORT
+Environment variables: ORS_API_KEY, SECRET_KEY, DEBUG=False, ALLOWED_HOSTS
 
 Frontend (Vercel)
-Root Directory: /frontend
 
-Variables: Set VITE_API_URL to your Railway public domain.
+Root directory: /frontend
+Build command: npm run build
+Output directory: dist
+Environment variable: VITE_API_URL = your Railway backend URL
 
- Project Structure
-Plaintext
+
+Project Structure
 spotter-eld/
-├── backend/            # Django API & HOS Engine
-└── frontend/           # React App & UI
- License
-Built by Samuelhdz201 for the Spotter AI Assessment.
+├── backend/
+│   ├── manage.py
+│   ├── requirements.txt
+│   ├── spotter_backend/        # Django project settings
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   └── trip_planner/           # Main app
+│       ├── models.py
+│       ├── serializers.py
+│       ├── views.py
+│       ├── urls.py
+│       └── services/
+│           ├── hos_engine.py       # HOS compliance engine
+│           ├── route_service.py    # ORS API + fallback routing
+│           └── log_generator.py    # Orchestrator
+└── frontend/
+    ├── package.json
+    ├── vite.config.js
+    └── src/
+        ├── App.jsx
+        ├── components/
+        │   ├── TripForm.jsx        # Input form
+        │   ├── RouteMap.jsx        # Leaflet map
+        │   ├── LogSheet.jsx        # Log sheets container
+        │   ├── LogSheetGrid.jsx    # SVG grid renderer
+        │   ├── StopsList.jsx       # Route stops timeline
+        │   └── Dashboard.jsx       # Trip summary
+        ├── services/
+        │   └── api.js
+        └── utils/
+            └── hosConstants.js
+            
+Built by **Samuelhdz201** (Romario) for the Spotter AI Full Stack Developer Assessment.
+
+            

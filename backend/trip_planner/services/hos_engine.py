@@ -229,8 +229,9 @@ def plan_trip_stops(
 
         # Check if entry crosses midnight
         if end_dt.date() > start_dt.date():
-            # Split at midnight
-            # First part: start to midnight
+            days_diff = (end_dt.date() - start_dt.date()).days
+
+            # First part: start_dt to midnight of that day
             if s_hour < 24.0:
                 current_day_entries.append(LogEntry(
                     status=status,
@@ -240,17 +241,16 @@ def plan_trip_stops(
                     remarks=remarks,
                 ))
 
-            # Finalize current day
+            # Finalize the day that start_dt belongs to
             _finalize_day(daily_logs, current_day_entries, day_number,
                           day_start_time, current_mile, location)
             day_number += 1
-            day_start_time = datetime(end_dt.year, end_dt.month, end_dt.day)
             current_day_entries = []
 
-            # Handle multiple full days (for long off-duty periods)
-            days_diff = (end_dt.date() - start_dt.date()).days
+            # Handle full intermediate days (for long off-duty/restart periods)
+            # These are complete 24-hour days between start and end
             for d in range(1, days_diff):
-                mid_day = day_start_time + timedelta(days=d - 1)
+                mid_day = datetime(start_dt.year, start_dt.month, start_dt.day) + timedelta(days=d)
                 off_day_entries = [LogEntry(
                     status=status, start_hour=0, end_hour=24.0,
                     location=location, remarks="Continuous " + status
@@ -259,9 +259,10 @@ def plan_trip_stops(
                               mid_day, 0, location)
                 day_number += 1
 
+            # Set the new day_start to the date of end_dt
             day_start_time = datetime(end_dt.year, end_dt.month, end_dt.day)
 
-            # Second part: midnight to end
+            # Second part: midnight to end_dt on the final day
             if e_hour > 0:
                 current_day_entries.append(LogEntry(
                     status=status,

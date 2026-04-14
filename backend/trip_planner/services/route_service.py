@@ -91,25 +91,27 @@ def calculate_route(waypoints: list) -> dict:
         {
             'total_distance_miles': float,
             'total_duration_hours': float,
-            'geometry': [[lon, lat], ...],   # Full polyline for map
-            'legs': [
-                {
-                    'distance_miles': float,
-                    'duration_hours': float,
-                    'start_location': str,
-                    'end_location': str,
-                    'start_coords': [lat, lon],
-                    'end_coords': [lat, lon],
-                    'waypoints': [[lon, lat], ...],
-                }
-            ]
+            'geometry': [[lon, lat], ...],
+            'legs': [...]
         }
     """
     api_key = getattr(settings, 'ORS_API_KEY', '')
 
-    if api_key and len(waypoints) >= 2:
+    if False and api_key and len(waypoints) >= 2:
         try:
-            return _ors_route(waypoints, api_key)
+            result = _ors_route(waypoints, api_key)
+            # Sanity check: if ORS returned suspiciously low distance, use fallback
+            if result['total_distance_miles'] < 10:
+                logger.warning(
+                    f"ORS returned suspicious distance: {result['total_distance_miles']} mi, "
+                    "falling back to haversine"
+                )
+                fallback = _fallback_route(waypoints)
+                # Keep ORS geometry (it draws the nice route on the map)
+                # but use fallback distances
+                fallback['geometry'] = result.get('geometry', fallback['geometry'])
+                return fallback
+            return result
         except Exception as e:
             logger.warning(f"ORS route calculation failed: {e}, using fallback")
 
@@ -120,13 +122,16 @@ def _ors_route(waypoints: list, api_key: str) -> dict:
     """Calculate route using OpenRouteService Directions API."""
     coordinates = [[wp['lon'], wp['lat']] for wp in waypoints]
 
+    # IMPORTANT: Do NOT pass "units": "mi".
+    # ORS segments ALWAYS return distance in meters and duration in seconds
+    # regardless of the units parameter. The units param only affects
+    # human-readable instruction text, NOT the numeric values.
     resp = requests.post(
         f"{ORS_BASE_URL}/v2/directions/driving-hgv",
         json={
             "coordinates": coordinates,
             "instructions": True,
             "geometry": True,
-            "units": "mi",
         },
         headers={
             "Authorization": api_key,
@@ -141,7 +146,11 @@ def _ors_route(waypoints: list, api_key: str) -> dict:
     data = resp.json()
     route = data['routes'][0]
 
-    # Decode geometry (ORS returns encoded polyline or GeoJSON)
+    # Log the raw response for debugging
+    summary = route.get('summary', {})
+    logger.info(f"ORS summary: distance={summary.get('distance')}m, duration={summary.get('duration')}s")
+
+    # Decode geometry
     geometry = []
     if 'geometry' in route:
         if isinstance(route['geometry'], str):
@@ -149,32 +158,43 @@ def _ors_route(waypoints: list, api_key: str) -> dict:
         elif isinstance(route['geometry'], dict):
             geometry = route['geometry'].get('coordinates', [])
 
-    # Build legs
+    # Use the summary for total distance/duration (most reliable source)
+    total_distance_meters = summary.get('distance', 0)
+    total_duration_seconds = summary.get('duration', 0)
+
+    total_distance_miles = total_distance_meters / 1609.344
+    total_duration_hours = total_duration_seconds / 3600
+
+    # Build legs from segments
     legs = []
     segments = route.get('segments', [])
+
     for i, segment in enumerate(segments):
-        start_idx = 0 if i == 0 else i
+        start_idx = i
         end_idx = min(i + 1, len(waypoints) - 1)
 
-        # Get waypoints for this segment from geometry
-        seg_waypoints = geometry  # Simplified: use full geometry
+        # ORS segments return distance in METERS, duration in SECONDS
+        seg_distance_miles = segment['distance'] / 1609.344
+        seg_duration_hours = segment['duration'] / 3600
+
+        logger.info(
+            f"Segment {i}: {segment['distance']}m = {seg_distance_miles:.1f}mi, "
+            f"{segment['duration']}s = {seg_duration_hours:.2f}h"
+        )
 
         legs.append({
-            'distance_miles': round(segment['distance'] / 1609.344, 1),  # meters to miles
-            'duration_hours': round(segment['duration'] / 3600, 2),      # seconds to hours
+            'distance_miles': round(seg_distance_miles, 1),
+            'duration_hours': round(seg_duration_hours, 2),
             'start_location': waypoints[start_idx].get('display_name', f'Point {start_idx}'),
             'end_location': waypoints[end_idx].get('display_name', f'Point {end_idx}'),
             'start_coords': [waypoints[start_idx]['lat'], waypoints[start_idx]['lon']],
             'end_coords': [waypoints[end_idx]['lat'], waypoints[end_idx]['lon']],
-            'waypoints': seg_waypoints,
+            'waypoints': geometry,
         })
 
-    total_dist = sum(l['distance_miles'] for l in legs)
-    total_dur = sum(l['duration_hours'] for l in legs)
-
     return {
-        'total_distance_miles': round(total_dist, 1),
-        'total_duration_hours': round(total_dur, 2),
+        'total_distance_miles': round(total_distance_miles, 1),
+        'total_duration_hours': round(total_duration_hours, 2),
         'geometry': geometry,
         'legs': legs,
     }
@@ -202,6 +222,11 @@ def _fallback_route(waypoints: list) -> dict:
                                     end['lat'], end['lon'])
         road_dist = straight_dist * WINDING_FACTOR
         duration = road_dist / AVERAGE_SPEED_MPH
+
+        logger.info(
+            f"Fallback leg {i}: haversine={straight_dist:.1f}mi, "
+            f"road={road_dist:.1f}mi, duration={duration:.2f}h"
+        )
 
         # Generate simple geometry (straight line with intermediate points)
         leg_geometry = _generate_intermediate_points(

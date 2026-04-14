@@ -1,226 +1,27 @@
-# Spotter AI — ELD Trip Planner & Log Generator
-
-A full-stack application that takes trip details as inputs and generates route instructions with compliant ELD (Electronic Logging Device) daily log sheets as outputs.
-
-## Features
-
-- **Trip Planning**: Enter current location, pickup, dropoff, and current cycle hours
-- **Route Calculation**: Uses OpenRouteService API to calculate optimal driving route
-- **HOS Compliance Engine**: Validates against FMCSA Hours of Service regulations:
-  - 11-hour driving limit
-  - 14-hour driving window
-  - 30-minute mandatory rest break after 8 hours driving
-  - 70-hour/8-day cycle limit
-  - 10-hour off-duty requirement between shifts
-  - Fuel stops every 1,000 miles
-- **Interactive Map**: Shows route with stops (fuel, rest, pickup, dropoff) using Leaflet
-- **Daily Log Sheets**: Generates FMCSA-compliant graph grid log sheets with drawn duty status lines
-- **Multi-day Support**: Automatically generates multiple log sheets for longer trips
-
-## Tech Stack
-
-- **Backend**: Django 5 + Django REST Framework
-- **Frontend**: React 18 + Vite + Tailwind CSS
-- **Maps**: Leaflet + OpenRouteService (free API)
-- **Log Rendering**: HTML Canvas / SVG for FMCSA grid
-
-## Assumptions (per assessment)
-
-- Property-carrying driver
-- 70-hour/8-day cycle
-- No adverse driving conditions
-- Fueling at least once every 1,000 miles
-- 1 hour for pickup and drop-off
-- Average speed: 55 mph (for time estimation)
-
----
-
-## Quick Start
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- OpenRouteService API key (free at https://openrouteservice.org/dev/#/signup)
-
-### Backend Setup
-
-```bash
-cd backend
+Spotter ELD — Trip Planner & Log GeneratorSpotter ELD is a high-performance full-stack application designed to transform trip details into optimized routes and FMCSA-compliant Electronic Logging Device (ELD) daily log sheets.Built as a technical assessment for the Spotter AI Full Stack Developer role. FeaturesTrip Planning: Interactive interface to input location, pickup/dropoff points, and current cycle status.Intelligent Route Calculation: Integrates OpenRouteService API for real-world commercial routing.HOS Compliance Engine: A robust backend engine that validates and enforces FMCSA Hours of Service regulations:11-hour driving limit & 14-hour duty window.Automatic 30-minute rest break insertion after 8 hours of driving.70-hour/8-day cycle tracking with 34-hour restart logic.Mandatory 10-hour off-duty reset between shifts.Pro Interactive Map: Customized Leaflet map with dark-mode integration, showing route geometry and categorized stops (Fuel, Rest, Pickup/Dropoff).ELD Log Sheets: High-fidelity SVG/Grid rendering of the official FMCSA graph, including 4-line duty status transitions and remarks.🛠 Tech StackBackend: Django 5 + Django REST Framework (Python 3.10+)Frontend: React 18 + Vite + Tailwind CSSMaps: Leaflet.js + OpenRouteServiceProduction: WhiteNoise (Static files), Gunicorn (WSGI Server)📋 HOS Rules ImplementedRuleLimitImplementation DetailDriving Limit11 HoursStops driving state once limit is reached within a shift.Duty Window14 HoursEnforces the "daily clock" starting from the first On-Duty event.Rest Break30 MinutesAutomatically inserts a break after 8 cumulative hours of driving.Off-Duty Reset10 HoursRequired consecutive rest period to reset the 11/14h clocks.Weekly Cycle70h / 8 daysTracks cumulative On-Duty time with a 34h restart detection.Fuel Stops1,000 MilesSmart insertion of 30-min fueling events based on distance.Service Time1 HourFixed On-Duty time for both Pickup and Dropoff locations.⚙️ Quick Start1. PrerequisitesPython 3.10+ & Node.js 18+OpenRouteService API key (Free at openrouteservice.org)2. Backend SetupBashcd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Create .env file
+# Environment Variables
 cp .env.example .env
-# Edit .env and add your ORS_API_KEY
-
+# Edit .env and add your ORS_API_KEY, DEBUG=True, and ALLOWED_HOSTS
 python manage.py migrate
 python manage.py runserver
-```
-
-Backend runs at http://localhost:8000
-
-### Frontend Setup
-
-```bash
-cd frontend
+Backend runs at http://localhost:80003. Frontend SetupBashcd frontend
 npm install
-cp .env.example .env
-# Edit .env if needed (default API URL is http://localhost:8000)
 
+# Environment Variables
+# Create a .env file in /frontend:
+# VITE_API_URL=http://localhost:8000
 npm run dev
-```
-
-Frontend runs at http://localhost:5173
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/trip/plan/` | Generate trip plan with route and log sheets |
-| GET | `/api/trip/health/` | Health check |
-
-### POST /api/trip/plan/
-
-**Request Body:**
-```json
-{
-  "current_location": "Dallas, TX",
-  "pickup_location": "Oklahoma City, OK",
-  "dropoff_location": "Denver, CO",
-  "current_cycle_used": 20
-}
-```
-
-**Response:**
-```json
-{
-  "trip": {
-    "current_location": "Dallas, TX",
-    "pickup_location": "Oklahoma City, OK",
-    "dropoff_location": "Denver, CO",
-    "current_cycle_used": 20,
-    "total_distance_miles": 890,
-    "total_driving_hours": 16.2,
-    "total_trip_days": 2
-  },
-  "route": {
-    "geometry": [[lon, lat], ...],
-    "legs": [...]
-  },
-  "stops": [
-    {
-      "type": "start",
-      "location": "Dallas, TX",
-      "coordinates": [lat, lon],
-      "mile_marker": 0,
-      "arrival_time": "2025-01-01T08:00:00",
-      "departure_time": "2025-01-01T08:00:00"
-    },
-    ...
-  ],
-  "daily_logs": [
-    {
-      "day": 1,
-      "date": "2025-01-01",
-      "entries": [
-        {
-          "status": "off_duty",
-          "start_hour": 0,
-          "end_hour": 8,
-          "location": "Dallas, TX",
-          "remarks": "Off duty"
-        },
-        ...
-      ],
-      "totals": {
-        "off_duty": 10,
-        "sleeper_berth": 0,
-        "driving": 11,
-        "on_duty_not_driving": 3
-      },
-      "total_miles": 605
-    }
-  ]
-}
-```
-
----
-
-## HOS Rules Implemented
-
-| Rule | Limit | Implementation |
-|------|-------|---------------|
-| Driving limit | 11 hours max | Enforced per shift |
-| Driving window | 14 hours from first on-duty | Stops driving at hour 14 |
-| Rest break | 30 min after 8h driving | Inserted automatically |
-| Off-duty | 10 consecutive hours | Required between shifts |
-| Weekly cycle | 70 hours / 8 days | Tracks cumulative on-duty |
-| Fuel stops | Every 1,000 miles | Auto-inserted |
-| Pickup/Dropoff | 1 hour each | On-duty not driving |
-
----
-
-## Deployment
-
-### Backend (Railway / Render)
-```bash
-cd backend
-# Uses gunicorn for production
-gunicorn spotter_backend.wsgi:application --bind 0.0.0.0:8000
-```
-
-### Frontend (Vercel)
-```bash
-cd frontend
-npm run build
-# Deploy dist/ folder to Vercel
-```
-
----
-
-## Project Structure
-
-```
-spotter-eld/
-├── backend/
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── .env.example
-│   ├── spotter_backend/
-│   │   ├── settings.py
-│   │   ├── urls.py
-│   │   └── wsgi.py
-│   └── trip_planner/
-│       ├── models.py
-│       ├── serializers.py
-│       ├── views.py
-│       ├── urls.py
-│       └── services/
-│           ├── route_service.py
-│           ├── hos_engine.py
-│           └── log_generator.py
-└── frontend/
-    ├── package.json
-    ├── vite.config.js
+Frontend runs at http://localhost:5173 DeploymentThis project is architected for seamless cloud deployment.Backend (Railway)Root Directory: /backendVariables: Set ORS_API_KEY, DEBUG=False, and SECRET_KEY in the Railway dashboard.CORS: Add your Vercel production URL to CORS_ALLOWED_ORIGINS in settings.py.Process: Railway uses the Procfile to run Gunicorn.Frontend (Vercel)Root Directory: /frontendVariables: Set VITE_API_URL to your Railway public domain.Build Command: npm run build Project StructurePlaintextspotter-eld/
+├── backend/            # Django API, HOS Engine & Log Logic
+│   ├── trip_planner/
+│   │   └── services/   # hos_engine.py, route_service.py, log_generator.py
+│   └── spotter_backend/ # Core settings & WSGI
+└── frontend/           # React App & UI Components
     └── src/
-        ├── App.jsx
-        ├── main.jsx
-        ├── components/
-        │   ├── TripForm.jsx
-        │   ├── RouteMap.jsx
-        │   ├── LogSheet.jsx
-        │   ├── LogSheetGrid.jsx
-        │   ├── StopsList.jsx
-        │   └── Dashboard.jsx
-        ├── services/
-        │   └── api.js
-        └── utils/
-            └── hosConstants.js
-```
-
-## License
-
-Built for Spotter AI Full Stack Developer Assessment.
+        ├── components/ # RouteMap, LogSheetGrid, Dashboard, etc.
+        └── services/   # api.js connection
+ LicenseBuilt by Samuelhdz201 for the Spotter AI Full Stack Developer Assessment.

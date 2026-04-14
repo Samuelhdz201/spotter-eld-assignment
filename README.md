@@ -16,7 +16,7 @@ Built as a technical assessment for the Spotter AI Full Stack Developer role.
 
 ---
 
-## 🛠 Tech Stack
+##  Tech Stack
 
 * **Backend:** Django 5 + Django REST Framework (Python 3.10+)
 * **Frontend:** React 18 + Vite + Tailwind CSS
